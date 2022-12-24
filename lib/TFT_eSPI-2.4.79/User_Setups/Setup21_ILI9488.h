@@ -5,7 +5,7 @@
 
 //#define TFT_INVERSION_OFF
 
-#define TFT_MISO 19 // (leave TFT SDO disconnected if other SPI devices share MISO)
+#define TFT_MISO -1 // (leave TFT SDO disconnected if other SPI devices share MISO)
 #define TFT_MOSI 23
 #define TFT_SCLK 18
 #define TFT_CS    5  // Chip select control pin
@@ -25,8 +25,8 @@
 
 
 // #define SPI_FREQUENCY  20000000
-#define SPI_FREQUENCY  25000000
-// #define SPI_FREQUENCY  40000000
+// #define SPI_FREQUENCY  25000000
+#define SPI_FREQUENCY  40000000
 // #define SPI_FREQUENCY  80000000
 
 // Optional reduced SPI frequency for reading TFT

@@ -269,12 +269,8 @@ unsigned long testFilledRoundRects() {
 unsigned long total = 0;
 unsigned long tn = 0;
 void setup() {
-  pinMode(TOUCH_CS_PIN, OUTPUT);
-  digitalWrite(TOUCH_CS_PIN, LOW);
-
   pinMode(BL_PIN, OUTPUT);
   digitalWrite(BL_PIN, LOW);
-
 
   Serial.begin(115200);
   while (!Serial);
