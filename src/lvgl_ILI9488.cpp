@@ -96,6 +96,12 @@ void setup() {
 #endif
 
     tft.init();
+    /*uint16_t c[20 * 20];
+    for (int i=0;i<(20*20);i++) {
+        c[i] = 0xFFFF;
+    }
+    tft.drawBitmap(0, 0, 20, 20, c);
+    while(1) delay(100);*/
 
     lv_disp_draw_buf_init(&draw_buf, buf, NULL, screenWidth * 10);
 

@@ -8,17 +8,17 @@
 #define LCD_ACTIVE() digitalWrite(TFT_CS, LOW)
 #define LCD_INACTIVE() digitalWrite(TFT_CS, HIGH)
 
-#define LCD_BACKLIGHT_ON() digitalWrite(TFT_BL, HIGH)
-#define LCD_BACKLIGHT_OFF() digitalWrite(TFT_BL, LOW)
+#define LCD_BACKLIGHT_ON() digitalWrite(TFT_BL, LOW)
+#define LCD_BACKLIGHT_OFF() digitalWrite(TFT_BL, HIGH)
 
 void DirectIOWrite(uint8_t data) {
-  for (uint8_t i=7;i>=0;i--) {
-    GPIO.out = (GPIO.out & (1 << TFT_SDA)) | 
+  for (int i=7;i>=0;i--) {
+    GPIO.out = (GPIO.out & (~((1 << TFT_SDA))) | 
                   (
                     (((data >> i) & 0x01) << TFT_SDA)
-                  ) |
-                  (1 << TFT_CLK) // Send data with CLK HIGH
-              ;
+                  )
+                );
+    GPIO.out_w1ts = 1 << TFT_CLK; // CLK set to HIGH
     GPIO.out_w1tc = 1 << TFT_CLK; // CLK set to LOW
   }
 }
@@ -78,8 +78,8 @@ void SwitchToGPIOMode() {
 }
 
 void SwitchToSPIMode() {
-  pinMatrixOutAttach(TFT_SDA, VSPID_IN_IDX, false, false);
-  pinMatrixOutAttach(TFT_CLK, VSPICLK_OUT_IDX, false, false);
+  pinMatrixOutAttach(TFT_SDA, HSPID_IN_IDX, false, false);
+  pinMatrixOutAttach(TFT_CLK, HSPICLK_OUT_IDX, false, false);
 }
 
 void ILI9488::init() {
@@ -100,8 +100,8 @@ void ILI9488::init() {
   
   // Init LCD
   SwitchToGPIOMode();
-  LCD_ACTIVE();
 
+  LCD_ACTIVE();
   WriteComm(0xE0);  // Positive Gamma Control
   WriteData(0x00);
   WriteData(0x03);
@@ -118,7 +118,9 @@ void ILI9488::init() {
   WriteData(0x16);
   WriteData(0x1A);
   WriteData(0x0F);
+  LCD_INACTIVE();
 
+  LCD_ACTIVE();
   WriteComm(0XE1);  // Negative Gamma Control
   WriteData(0x00);
   WriteData(0x16);
@@ -135,61 +137,88 @@ void ILI9488::init() {
   WriteData(0x35);
   WriteData(0x37);
   WriteData(0x0F);
+  LCD_INACTIVE();
 
+  LCD_ACTIVE();
   WriteComm(0XC0);  // Power Control 1
   WriteData(0x17);
   WriteData(0x15);
+  LCD_INACTIVE();
 
+  LCD_ACTIVE();
   WriteComm(0xC1);  // Power Control 2
   WriteData(0x41);
+  LCD_INACTIVE();
 
+  LCD_ACTIVE();
   WriteComm(0xC5);  // VCOM Control
   WriteData(0x00);
   WriteData(0x12);
   WriteData(0x80);
+  LCD_INACTIVE();
 
-  WriteComm(TFT_MADCTL);  // Memory Access Control
-  WriteData(0x48);           // MX, BGR
-
+  LCD_ACTIVE();
   WriteComm(0x3A);  // Pixel Interface Format
   WriteData(0x66);     // 18 bit colour for SPI
+  LCD_INACTIVE();
 
+  LCD_ACTIVE();
   WriteComm(0xB0);  // Interface Mode Control
   WriteData(0x00);
+  LCD_INACTIVE();
 
+  LCD_ACTIVE();
   WriteComm(0xB1);  // Frame Rate Control
   WriteData(0xA0);
+  LCD_INACTIVE();
 
+  LCD_ACTIVE();
   WriteComm(0xB4);  // Display Inversion Control
   WriteData(0x02);
+  LCD_INACTIVE();
 
+  LCD_ACTIVE();
   WriteComm(0xB6);  // Display Function Control
   WriteData(0x02);
   WriteData(0x02);
   WriteData(0x3B);
+  LCD_INACTIVE();
 
+  LCD_ACTIVE();
   WriteComm(0xB7);  // Entry Mode Set
   WriteData(0xC6);
+  LCD_INACTIVE();
 
+  LCD_ACTIVE();
   WriteComm(0xF7);  // Adjust Control 3
   WriteData(0xA9);
   WriteData(0x51);
   WriteData(0x2C);
   WriteData(0x82);
-
-  WriteComm(TFT_SLPOUT);  // Exit Sleep
-  delay(120);
-
-  WriteComm(TFT_DISPON);  // Display on
-  delay(25);
-
-  // Filp
-  WriteComm(TFT_MADCTL);
-  WriteData(TFT_MAD_MX | TFT_MAD_MY | TFT_MAD_MV | TFT_MAD_BGR);
-
   LCD_INACTIVE();
 
+  // Filp
+  LCD_ACTIVE();
+  WriteComm(TFT_MADCTL);
+  WriteData(TFT_MAD_MX | TFT_MAD_MY | TFT_MAD_MV | TFT_MAD_BGR);
+  LCD_INACTIVE();
+
+  LCD_ACTIVE();
+  WriteComm(TFT_SLPOUT);  // Exit Sleep
+  LCD_INACTIVE();
+
+  delay(120);
+
+  LCD_ACTIVE();
+  WriteComm(TFT_DISPON);  // Display on
+  LCD_INACTIVE();
+
+  delay(25);
+
+
   Serial.println("Setup with Direct IO OK !");
+
+  // while(1) delay(100);
 
   // Use SPI module
   // Setup SPI
@@ -210,7 +239,7 @@ void ILI9488::init() {
 
   // Set SPI Mode 0
   spi_dev->pin.ck_idle_edge = 0;
-  spi_dev->user.ck_out_edge = 1;
+  spi_dev->user.ck_out_edge = 0;
 
   // Set MSBFIRST
   spi_dev->ctrl.wr_bit_order = 0;
@@ -273,11 +302,22 @@ void ILI9488::drawBitmap(int x_start, int y_start, int x_end, int y_end, uint16_
   // Set data
   uint32_t color_len = (x_end - x_start + 1) * (y_end - y_start + 1);
   uint8_t byte_index = 0;
+  // uint8_t *buff = (uint8_t*) spi_dev->data_buf;
+  uint32_t local_32bit_buffer[16];
+  memset(local_32bit_buffer, 0, sizeof(local_32bit_buffer));
+  uint8_t *buff = (uint8_t*) local_32bit_buffer;
   for (uint32_t i=0;i<color_len;i++) {
-    ((uint8_t*)(spi_dev->data_buf))[byte_index++] = (color_data[i] >> 11) & 0x1F; // R6
-    ((uint8_t*)(spi_dev->data_buf))[byte_index++] = (color_data[i] >> 5) & 0x3F;  // G6
-    ((uint8_t*)(spi_dev->data_buf))[byte_index++] = (color_data[i] >> 0) & 0x1F;  // B6
+    uint16_t c = color_data[i];
+    // Serial.printf("c = 0x%04x\n", c);
+    buff[byte_index + 0] = ((c >> 8) & 0xF8); // R6
+    buff[byte_index + 1] = ((c >> 3) & 0xFC);  // G6
+    buff[byte_index + 2] = ((c << 3) & 0xF8);  // B6
+    byte_index += 3;
     if ((byte_index == 63) || (i == (color_len - 1))) {
+      for (uint8_t i=0;i<16;i++) {
+        spi_dev->data_buf[i] = local_32bit_buffer[i];
+      }
+
       // Set length
       spi_dev->mosi_dlen.usr_mosi_dbitlen = (byte_index * 8) - 1;
 
