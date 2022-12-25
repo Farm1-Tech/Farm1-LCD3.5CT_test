@@ -5,8 +5,12 @@
 #include <soc/dport_access.h>
 #include <soc/dport_reg.h>
 
+/*
 #define LCD_ACTIVE() digitalWrite(TFT_CS, LOW)
 #define LCD_INACTIVE() digitalWrite(TFT_CS, HIGH)
+*/
+#define LCD_ACTIVE() (GPIO.out_w1tc = 1 << TFT_CS)
+#define LCD_INACTIVE() (GPIO.out_w1ts = 1 << TFT_CS)
 
 #define LCD_BACKLIGHT_ON() digitalWrite(TFT_BL, LOW)
 #define LCD_BACKLIGHT_OFF() digitalWrite(TFT_BL, HIGH)
@@ -302,17 +306,15 @@ void ILI9488::drawBitmap(int x_start, int y_start, int x_end, int y_end, uint16_
   // Set data
   uint32_t color_len = (x_end - x_start + 1) * (y_end - y_start + 1);
   uint8_t byte_index = 0;
-  // uint8_t *buff = (uint8_t*) spi_dev->data_buf;
   uint32_t local_32bit_buffer[16];
   memset(local_32bit_buffer, 0, sizeof(local_32bit_buffer));
   uint8_t *buff = (uint8_t*) local_32bit_buffer;
+  uint16_t c;
   for (uint32_t i=0;i<color_len;i++) {
-    uint16_t c = color_data[i];
-    // Serial.printf("c = 0x%04x\n", c);
-    buff[byte_index + 0] = ((c >> 8) & 0xF8); // R6
-    buff[byte_index + 1] = ((c >> 3) & 0xFC);  // G6
-    buff[byte_index + 2] = ((c << 3) & 0xF8);  // B6
-    byte_index += 3;
+    c = color_data[i];
+    buff[byte_index++] = ((c >> 8) & 0xF8); // R6
+    buff[byte_index++] = ((c >> 3) & 0xFC);  // G6
+    buff[byte_index++] = ((c << 3) & 0xF8);  // B6
     if ((byte_index == 63) || (i == (color_len - 1))) {
       for (uint8_t i=0;i<16;i++) {
         spi_dev->data_buf[i] = local_32bit_buffer[i];
